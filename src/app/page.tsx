@@ -8,7 +8,8 @@ import ActionButtons from '@/components/ActionButtons';
 import PromoModal from '@/components/PromoModal';
 import { ContactInfo, emptyContact, hasMinimumContact, normalizeContact } from '@/lib/vcard';
 import { generateQRCode, QRCodeResult } from '@/lib/qrcode';
-import { Leaf, QrCode, ScanLine, Smartphone, Sparkles } from 'lucide-react';
+import { Leaf, ScanLine, Smartphone, Sparkles } from 'lucide-react';
+import Image from 'next/image';
 
 const DRAFT_KEY = 'ariona:name-card:draft';
 const QR_DEBOUNCE_MS = 400;
@@ -110,10 +111,8 @@ export default function Home() {
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/80 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900">
-              <QrCode className="h-4 w-4 text-white" aria-hidden="true" />
-            </span>
-            <span className="text-sm font-semibold text-slate-900">Ariona Name Cards</span>
+            <Image src="/ariona.png" alt="Ariona Logo" width={80} height={80} className="object-contain"/>
+            {/* <span className="text-sm font-semibold text-slate-900">Ariona Online</span> */}
           </Link>
           <span className="hidden items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 sm:flex">
             <Sparkles className="h-3 w-3" aria-hidden="true" />
