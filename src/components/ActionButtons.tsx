@@ -1,147 +1,262 @@
 'use client';
 
-import { ContactInfo, downloadVCard } from '@/lib/vcard';
-import { downloadQRCode } from '@/lib/qrcode';
-import { Download, QrCode, Share2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ContactInfo, contactFileBase, downloadVCard, hasMinimumContact } from '@/lib/vcard';
+import { canEncodeFullVCard, downloadFullVCardQR, downloadQRCode } from '@/lib/qrcode';
+import { Check, Download, Loader2, QrCode, RotateCcw, Share2 } from 'lucide-react';
 
 interface ActionButtonsProps {
   contactInfo: ContactInfo;
   qrCodeUrl?: string;
+  onReset: () => void;
 }
 
-export default function ActionButtons({ contactInfo, qrCodeUrl }: ActionButtonsProps) {
+type Busy = 'vcard' | 'qr' | 'share' | 'full-qr' | null;
+
+const isAbort = (error: unknown): boolean =>
+  error instanceof DOMException && error.name === 'AbortError';
+
+export default function ActionButtons({ contactInfo, qrCodeUrl, onReset }: ActionButtonsProps) {
+  const [busy, setBusy] = useState<Busy>(null);
+  const [toast, setToast] = useState<{ tone: 'ok' | 'error'; message: string } | null>(null);
+  const [canShareFiles, setCanShareFiles] = useState(false);
+  const [fullQrFits, setFullQrFits] = useState(false);
+
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isReady = hasMinimumContact(contactInfo);
+
+  const notify = (tone: 'ok' | 'error', message: string) => {
+    setToast({ tone, message });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3200);
+  };
+
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
+
+  // Feature-detect in an effect so the server and client render the same markup.
+  useEffect(() => {
+    setCanShareFiles(
+      typeof navigator !== 'undefined' &&
+      typeof navigator.share === 'function' &&
+      typeof navigator.canShare === 'function'
+    );
+  }, []);
+
+  // Only offer the photo QR when the payload genuinely fits — otherwise the
+  // button can never succeed.
+  useEffect(() => {
+    if (!isReady || !contactInfo.profileImage) {
+      setFullQrFits(false);
+      return;
+    }
+
+    let cancelled = false;
+    canEncodeFullVCard(contactInfo).then((fits) => {
+      if (!cancelled) setFullQrFits(fits);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [contactInfo, isReady]);
+
   const handleDownloadVCard = () => {
-    downloadVCard(contactInfo);
-  };
-
-  const handleDownloadQR = async () => {
-    await downloadQRCode(contactInfo);
-  };
-
-  const handleShare = async () => {
-    if (navigator.share && qrCodeUrl) {
-      try {
-        // Convert data URL to blob for sharing
-        const response = await fetch(qrCodeUrl);
-        const blob = await response.blob();
-        const file = new File([blob], `${contactInfo.firstName}_${contactInfo.lastName}_QR.png`, {
-          type: 'image/png',
-        });
-
-        await navigator.share({
-          title: `${contactInfo.firstName} ${contactInfo.lastName} - Contact Card`,
-          text: `Contact information for ${contactInfo.firstName} ${contactInfo.lastName}`,
-          files: [file],
-        });
-      } catch (error) {
-        console.error('Error sharing:', error);
-        // Fallback to download if sharing fails
-        handleDownloadQR();
-      }
-    } else {
-      // Fallback for browsers that don't support Web Share API
-      handleDownloadQR();
+    setBusy('vcard');
+    try {
+      downloadVCard(contactInfo);
+      notify('ok', 'vCard downloaded');
+    } catch {
+      notify('error', 'Could not create the vCard file.');
+    } finally {
+      setBusy(null);
     }
   };
 
-  const isContactComplete = contactInfo.firstName && contactInfo.lastName && 
-    (contactInfo.phone || contactInfo.email);
+  const handleDownloadQR = async () => {
+    setBusy('qr');
+    try {
+      await downloadQRCode(contactInfo);
+      notify('ok', 'QR code downloaded');
+    } catch {
+      notify('error', 'Your details are too long to fit in a QR code.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!qrCodeUrl) return;
+
+    setBusy('share');
+    try {
+      const blob = await (await fetch(qrCodeUrl)).blob();
+      const file = new File([blob], `${contactFileBase(contactInfo)}-qr.png`, {
+        type: 'image/png'
+      });
+
+      if (!navigator.canShare({ files: [file] })) {
+        await downloadQRCode(contactInfo);
+        notify('ok', 'Sharing files isn’t supported here — downloaded instead');
+        return;
+      }
+
+      await navigator.share({
+        title: `${contactFileBase(contactInfo)} — contact card`,
+        files: [file]
+      });
+    } catch (error) {
+      // Dismissing the native share sheet raises AbortError. That's a
+      // deliberate "no" from the user, so do nothing at all.
+      if (!isAbort(error)) {
+        notify('error', 'Sharing failed. Try downloading the QR code instead.');
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleFullQR = async () => {
+    setBusy('full-qr');
+    try {
+      await downloadFullVCardQR(contactInfo);
+      notify('ok', 'QR code with photo downloaded');
+    } catch {
+      notify('error', 'The photo makes this QR code too large. Use the vCard download.');
+      setFullQrFits(false);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const primary =
+    'flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold ' +
+    'shadow-sm transition-colors disabled:cursor-not-allowed';
+  const secondary =
+    'flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white ' +
+    'px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors ' +
+    'hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-400';
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Actions</h2>
-      
-      <div className="space-y-4">
-        {/* Download vCard */}
+    <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5">
+      <header className="border-b border-slate-100 bg-slate-50/60 px-5 py-4 sm:px-6">
+        <h2 className="text-base font-semibold text-slate-900">Download &amp; share</h2>
+        <p className="mt-0.5 text-xs text-slate-500">Free, unlimited, no account.</p>
+      </header>
+
+      <div className="space-y-3 p-5 sm:p-6">
+        {!isReady && (
+          <p id="actions-hint" className="rounded-lg bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
+            Add your name plus a phone number or email to unlock downloads.
+          </p>
+        )}
+
         <button
+          type="button"
           onClick={handleDownloadVCard}
-          disabled={!isContactComplete}
-          className={`w-full flex items-center justify-center px-4 py-3 rounded-lg font-semibold transition-colors ${
-            isContactComplete
-              ? 'bg-blue-600 hover:bg-blue-700 text-white'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          disabled={!isReady || busy !== null}
+          aria-describedby={isReady ? undefined : 'actions-hint'}
+          className={`${primary} ${
+            isReady
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'bg-slate-100 text-slate-400'
           }`}
         >
-          <Download className="w-5 h-5 mr-2" />
+          {busy === 'vcard' ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <Download className="h-4 w-4" aria-hidden="true" />
+          )}
           Download vCard (.vcf)
         </button>
 
-        {/* Download QR Code */}
         <button
+          type="button"
           onClick={handleDownloadQR}
-          disabled={!isContactComplete}
-          className={`w-full flex items-center justify-center px-4 py-3 rounded-lg font-semibold transition-colors ${
-            isContactComplete
-              ? 'bg-green-600 hover:bg-green-700 text-white'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
+          disabled={!isReady || busy !== null}
+          aria-describedby={isReady ? undefined : 'actions-hint'}
+          className={secondary}
         >
-          <QrCode className="w-5 h-5 mr-2" />
-          Download QR Code
+          {busy === 'qr' ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <QrCode className="h-4 w-4" aria-hidden="true" />
+          )}
+          Download QR code
         </button>
 
-        {/* Share */}
-        <button
-          onClick={handleShare}
-          disabled={!isContactComplete || !qrCodeUrl}
-          className={`w-full flex items-center justify-center px-4 py-3 rounded-lg font-semibold transition-colors ${
-            isContactComplete && qrCodeUrl
-              ? 'bg-purple-600 hover:bg-purple-700 text-white'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
-        >
-          <Share2 className="w-5 h-5 mr-2" />
-          Share QR Code
-        </button>
-
-        {/* Generate Full QR with Image (experimental) */}
-        {contactInfo.profileImage && (
+        {canShareFiles && (
           <button
-            onClick={async () => {
-              try {
-                const { generateFullVCardQR } = await import('@/lib/qrcode');
-                const fullQR = await generateFullVCardQR(contactInfo);
-                const link = document.createElement('a');
-                link.href = fullQR;
-                link.download = `${contactInfo.firstName}_${contactInfo.lastName}_Full_QR.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-              } catch {
-                alert('Image is too large for QR code. Use the regular QR code or reduce image size.');
-              }
-            }}
-            disabled={!isContactComplete}
-            className={`w-full flex items-center justify-center px-4 py-3 rounded-lg font-semibold transition-colors border-2 ${
-              isContactComplete
-                ? 'border-orange-300 text-orange-700 hover:bg-orange-50'
-                : 'border-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
+            type="button"
+            onClick={handleShare}
+            disabled={!isReady || !qrCodeUrl || busy !== null}
+            className={secondary}
           >
-            <QrCode className="w-5 h-5 mr-2" />
-            Try QR with Photo (Experimental)
+            {busy === 'share' ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Share2 className="h-4 w-4" aria-hidden="true" />
+            )}
+            Share QR code
           </button>
         )}
-      </div>
 
-      {/* Instructions */}
-      <div className="mt-6 space-y-4">
-        <div className="p-4 bg-gray-50 rounded-lg">
-          <h4 className="font-semibold text-gray-900 mb-2">💡 How to Use</h4>
-          <ul className="text-sm text-gray-700 space-y-1">
-            <li>• <strong>vCard (.vcf):</strong> Complete contact info with photo for direct import</li>
-            <li>• <strong>QR Code:</strong> Essential contact info (no photo) for instant scanning</li>
-            <li>• <strong>Share:</strong> Send QR code via messages or social media</li>
-          </ul>
+        {fullQrFits && (
+          <button
+            type="button"
+            onClick={handleFullQR}
+            disabled={busy !== null}
+            className={secondary}
+          >
+            {busy === 'full-qr' ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <QrCode className="h-4 w-4" aria-hidden="true" />
+            )}
+            Download QR code with photo
+          </button>
+        )}
+
+        <div className="border-t border-slate-100 pt-3">
+          <button
+            type="button"
+            onClick={onReset}
+            className="flex items-center gap-1.5 text-xs font-medium text-slate-500 transition-colors hover:text-red-600"
+          >
+            <RotateCcw className="h-3 w-3" aria-hidden="true" />
+            Clear all fields
+          </button>
         </div>
 
-        <div className="p-4 bg-yellow-50 rounded-lg">
-          <h4 className="font-semibold text-yellow-800 mb-2">📱 Smartphone Compatibility</h4>
-          <p className="text-sm text-yellow-700">
-            iOS and Android devices can automatically detect and save contact information 
-            when scanning the QR code with their default camera apps.
+        <div className="space-y-1.5 rounded-xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-600">
+          <p>
+            <span className="font-semibold text-slate-900">vCard</span> — every detail, photo
+            included. Best for sending directly to someone.
+          </p>
+          <p>
+            <span className="font-semibold text-slate-900">QR code</span> — contact details without
+            the photo. Best for print, slides and screens.
           </p>
         </div>
+      </div>
+
+      {/* Toast */}
+      <div
+        aria-live="polite"
+        className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4"
+      >
+        {toast && (
+          <p
+            className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium shadow-lg ${
+              toast.tone === 'ok' ? 'bg-slate-900 text-white' : 'bg-red-600 text-white'
+            }`}
+          >
+            {toast.tone === 'ok' && <Check className="h-4 w-4" aria-hidden="true" />}
+            {toast.message}
+          </p>
+        )}
       </div>
     </div>
   );

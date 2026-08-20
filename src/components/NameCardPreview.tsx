@@ -1,138 +1,161 @@
 'use client';
 
-import { ContactInfo } from '@/lib/vcard';
-import { Phone, Mail, Globe, MapPin, Building2 } from 'lucide-react';
+import { ContactInfo, displayName } from '@/lib/vcard';
+import { Building2, Globe, Loader2, Mail, MapPin, Phone, QrCode } from 'lucide-react';
 
 interface NameCardPreviewProps {
   contactInfo: ContactInfo;
   qrCodeUrl?: string;
+  isRefreshing?: boolean;
+  qrError?: string | null;
+  qrOmittedExtras?: boolean;
 }
 
-export default function NameCardPreview({ contactInfo, qrCodeUrl }: NameCardPreviewProps) {
-  const hasAddress = contactInfo.address.street || contactInfo.address.city || contactInfo.address.state;
-  
+const initials = (contact: ContactInfo): string => {
+  const letters = [contact.firstName.trim()[0], contact.lastName.trim()[0]].filter(Boolean);
+  return letters.join('').toUpperCase() || '·';
+};
+
+function DetailRow({ icon: Icon, children }: { icon: typeof Phone; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Name Card Preview</h2>
-      
-      {/* Business Card Design */}
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg p-8 shadow-md border max-w-lg mx-auto">
-        <div className="flex justify-between items-start">
-          {/* Profile Image */}
-          {contactInfo.profileImage && (
-            <div className="mr-4 flex-shrink-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={contactInfo.profileImage}
-                alt="Profile"
-                className="w-20 h-20 object-cover rounded-full border-3 border-white shadow-md"
-              />
-            </div>
-          )}
-          
-          {/* Contact Details */}
-          <div className="flex-1">
-            <div className="mb-4">
-              <h3 className="text-2xl font-bold text-gray-900">
-                {contactInfo.firstName || 'First'} {contactInfo.lastName || 'Last'}
-              </h3>
-              {contactInfo.title && (
-                <p className="text-lg text-gray-700 mt-1">{contactInfo.title}</p>
-              )}
-              {contactInfo.organization && (
-                <p className="text-md text-gray-600 mt-1 flex items-center">
-                  <Building2 className="w-4 h-4 mr-2" />
-                  {contactInfo.organization}
-                </p>
+    <div className="flex items-start gap-2.5 text-sm text-slate-300">
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden="true" />
+      <span className="min-w-0 break-words">{children}</span>
+    </div>
+  );
+}
+
+export default function NameCardPreview({
+  contactInfo,
+  qrCodeUrl,
+  isRefreshing,
+  qrError,
+  qrOmittedExtras
+}: NameCardPreviewProps) {
+  const { address } = contactInfo;
+  const cityLine = [address.city, address.state, address.zip].filter(Boolean).join(', ');
+  const hasAddress = Boolean(address.street || cityLine || address.country);
+  const name = displayName(contactInfo);
+
+  return (
+    <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5">
+      <header className="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-4 sm:px-6">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Live preview</h2>
+          <p className="mt-0.5 text-xs text-slate-500">Updates as you type.</p>
+        </div>
+        {isRefreshing && (
+          <span className="flex items-center gap-1.5 text-xs text-slate-400" role="status">
+            <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+            Updating
+          </span>
+        )}
+      </header>
+
+      <div className="p-5 sm:p-6">
+        {/* The card itself */}
+        <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 p-5 shadow-lg ring-1 ring-slate-900/10 sm:p-6">
+          <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-6">
+            <div className="min-w-0">
+              <div className="flex items-center gap-3.5">
+                {contactInfo.profileImage ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={contactInfo.profileImage}
+                    alt=""
+                    className="h-14 w-14 shrink-0 rounded-full object-cover ring-2 ring-white/15"
+                  />
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/10 text-base font-semibold text-slate-300 ring-2 ring-white/10"
+                  >
+                    {initials(contactInfo)}
+                  </span>
+                )}
+
+                <div className="min-w-0">
+                  <p className="text-lg font-semibold leading-snug text-white break-words">
+                    {name || <span className="text-slate-500">Your name</span>}
+                  </p>
+                  {contactInfo.title && (
+                    <p className="mt-0.5 text-sm text-slate-400 break-words">{contactInfo.title}</p>
+                  )}
+                </div>
+              </div>
+
+              {(contactInfo.organization ||
+                contactInfo.phone ||
+                contactInfo.email ||
+                contactInfo.website ||
+                hasAddress) && (
+                <div className="mt-5 space-y-2 border-t border-white/10 pt-5">
+                  {contactInfo.organization && (
+                    <DetailRow icon={Building2}>{contactInfo.organization}</DetailRow>
+                  )}
+                  {contactInfo.phone && <DetailRow icon={Phone}>{contactInfo.phone}</DetailRow>}
+                  {contactInfo.email && <DetailRow icon={Mail}>{contactInfo.email}</DetailRow>}
+                  {contactInfo.website && <DetailRow icon={Globe}>{contactInfo.website}</DetailRow>}
+                  {hasAddress && (
+                    <DetailRow icon={MapPin}>
+                      {[address.street, cityLine, address.country].filter(Boolean).join(' · ')}
+                    </DetailRow>
+                  )}
+                </div>
               )}
             </div>
 
-            <div className="space-y-2 text-sm">
-              {contactInfo.phone && (
-                <div className="flex items-center text-gray-700">
-                  <Phone className="w-4 h-4 mr-2 flex-shrink-0" />
-                  <span>{contactInfo.phone}</span>
+            {/* QR chip — items-start keeps the white chip from stretching to row height. */}
+            <div className="flex shrink-0 items-start justify-start sm:justify-end">
+              {qrCodeUrl ? (
+                <div className="rounded-xl bg-white p-2 shadow-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={qrCodeUrl}
+                    alt={
+                      name
+                        ? `QR code containing the contact details for ${name}`
+                        : 'QR code containing your contact details'
+                    }
+                    className="h-24 w-24 object-contain"
+                  />
                 </div>
-              )}
-              
-              {contactInfo.email && (
-                <div className="flex items-center text-gray-700">
-                  <Mail className="w-4 h-4 mr-2 flex-shrink-0" />
-                  <span className="break-all">{contactInfo.email}</span>
-                </div>
-              )}
-              
-              {contactInfo.website && (
-                <div className="flex items-center text-gray-700">
-                  <Globe className="w-4 h-4 mr-2 flex-shrink-0" />
-                  <span className="break-all">{contactInfo.website}</span>
-                </div>
-              )}
-              
-              {hasAddress && (
-                <div className="flex items-start text-gray-700">
-                  <MapPin className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
-                  <span>
-                    {contactInfo.address.street && (
-                      <div>{contactInfo.address.street}</div>
-                    )}
-                    <div>
-                      {[
-                        contactInfo.address.city,
-                        contactInfo.address.state,
-                        contactInfo.address.zip
-                      ].filter(Boolean).join(', ')}
-                    </div>
-                    {contactInfo.address.country && (
-                      <div>{contactInfo.address.country}</div>
-                    )}
+              ) : (
+                <div className="flex h-[112px] w-[112px] flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/15 bg-white/5 px-2 text-center">
+                  <QrCode className="h-5 w-5 text-slate-500" aria-hidden="true" />
+                  <span className="text-[10px] leading-tight text-slate-500">
+                    {qrError ? 'Unavailable' : 'Add a name and phone or email'}
                   </span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* QR Code */}
-          <div className={`flex-shrink-0 ${contactInfo.profileImage ? 'ml-4' : 'ml-auto'}`}>
-            {qrCodeUrl ? (
-              <div className="bg-white p-2 rounded-lg shadow-sm">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img 
-                  src={qrCodeUrl} 
-                  alt="QR Code for contact info" 
-                  className="w-20 h-20 object-contain"
-                />
-              </div>
-            ) : (
-              <div className="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center">
-                <span className="text-xs text-gray-500 text-center">QR Code</span>
-              </div>
-            )}
-          </div>
+          {contactInfo.note && (
+            <p className="mt-5 border-t border-white/10 pt-4 text-xs leading-relaxed text-slate-400">
+              {contactInfo.note}
+            </p>
+          )}
         </div>
 
-        {/* Notes */}
-        {contactInfo.note && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <p className="text-xs text-gray-600 italic">{contactInfo.note}</p>
-          </div>
-        )}
-      </div>
-
-      {/* Instructions */}
-      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-        <h4 className="font-semibold text-blue-900 mb-2">📱 Smartphone Auto-Save</h4>
-        <p className="text-sm text-blue-800">
-          When someone scans the QR code with their smartphone camera, they can automatically 
-          save your contact information to their contacts app. The vCard format ensures 
-          compatibility with iPhone and Android devices.
-        </p>
-        {contactInfo.profileImage && (
-          <p className="text-xs text-blue-700 mt-2">
-            <strong>Note:</strong> QR code contains contact info without photo due to size limits. 
-            Download the vCard file for complete info including your photo.
+        {/* Status notes */}
+        <div className="mt-4 space-y-2">
+          {qrError && (
+            <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+              {qrError}
+            </p>
+          )}
+          {qrOmittedExtras && !qrError && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Your address and notes were left out of the QR code to keep it scannable. The vCard
+              download still includes everything.
+            </p>
+          )}
+          <p className="text-xs leading-relaxed text-slate-500">
+            Scanning this code with an iPhone or Android camera offers to save your details straight
+            to the contacts app.
           </p>
-        )}
+        </div>
       </div>
     </div>
   );

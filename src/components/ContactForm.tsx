@@ -1,214 +1,189 @@
 'use client';
 
 import { ContactInfo } from '@/lib/vcard';
-import { User, Building2, Phone, Mail, Globe, MapPin, FileText } from 'lucide-react';
+import { Building2, FileText, Globe, Mail, MapPin, Phone, User } from 'lucide-react';
 import ProfileImageUpload from './ProfileImageUpload';
+import { TextAreaField, TextField } from './ui/Fields';
 
 interface ContactFormProps {
   contactInfo: ContactInfo;
   onContactChange: (contact: ContactInfo) => void;
 }
 
+interface SectionProps {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}
+
+function Section({ title, description, children }: SectionProps) {
+  return (
+    <section className="border-t border-slate-100 px-5 py-6 first:border-t-0 sm:px-6">
+      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+      {description && <p className="mt-0.5 text-xs text-slate-500">{description}</p>}
+      <div className="mt-4 space-y-4">{children}</div>
+    </section>
+  );
+}
+
 export default function ContactForm({ contactInfo, onContactChange }: ContactFormProps) {
-  const handleInputChange = (field: keyof ContactInfo, value: string) => {
-    onContactChange({
-      ...contactInfo,
-      [field]: value
-    });
+  const handleInputChange = (field: keyof Omit<ContactInfo, 'address'>, value: string) => {
+    onContactChange({ ...contactInfo, [field]: value });
   };
 
   const handleAddressChange = (field: keyof ContactInfo['address'], value: string) => {
     onContactChange({
       ...contactInfo,
-      address: {
-        ...contactInfo.address,
-        [field]: value
-      }
+      address: { ...contactInfo.address, [field]: value }
     });
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Contact Information</h2>
-      
-      {/* Profile Image Upload */}
-      <ProfileImageUpload
-        profileImage={contactInfo.profileImage}
-        onImageChange={(imageDataUrl) => 
-          handleInputChange('profileImage', imageDataUrl || '')
-        }
-      />
-      
-      {/* Personal Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <User className="inline w-4 h-4 mr-1" />
-            First Name
-          </label>
-          <input
-            type="text"
+    <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5">
+      <header className="border-b border-slate-100 bg-slate-50/60 px-5 py-4 sm:px-6">
+        <h2 className="text-base font-semibold text-slate-900">Your details</h2>
+        <p className="mt-0.5 text-xs text-slate-500">
+          Everything stays in your browser — nothing is uploaded.
+        </p>
+      </header>
+
+      <Section title="Photo" description="Optional. Included in the downloadable vCard.">
+        <ProfileImageUpload
+          profileImage={contactInfo.profileImage}
+          onImageChange={(imageDataUrl) =>
+            onContactChange({ ...contactInfo, profileImage: imageDataUrl ?? undefined })
+          }
+        />
+      </Section>
+
+      <Section title="Name & role">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <TextField
+            label="First name"
+            icon={User}
             value={contactInfo.firstName}
-            onChange={(e) => handleInputChange('firstName', e.target.value)}
-            className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200"
-            placeholder="John"
+            onChange={(value) => handleInputChange('firstName', value)}
+            placeholder="Jane"
+            autoComplete="given-name"
           />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <User className="inline w-4 h-4 mr-1" />
-            Last Name
-          </label>
-          <input
-            type="text"
+          <TextField
+            label="Last name"
+            icon={User}
             value={contactInfo.lastName}
-            onChange={(e) => handleInputChange('lastName', e.target.value)}
-            className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200"
-            placeholder="Doe"
+            onChange={(value) => handleInputChange('lastName', value)}
+            placeholder="Okafor"
+            autoComplete="family-name"
           />
-        </div>
-      </div>
-
-      {/* Professional Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <Building2 className="inline w-4 h-4 mr-1" />
-            Organization
-          </label>
-          <input
-            type="text"
-            value={contactInfo.organization}
-            onChange={(e) => handleInputChange('organization', e.target.value)}
-            className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200"
-            placeholder="Company Name"
-          />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <FileText className="inline w-4 h-4 mr-1" />
-            Job Title
-          </label>
-          <input
-            type="text"
+          <TextField
+            label="Job title"
+            icon={FileText}
             value={contactInfo.title}
-            onChange={(e) => handleInputChange('title', e.target.value)}
-            className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200"
-            placeholder="Software Engineer"
+            onChange={(value) => handleInputChange('title', value)}
+            placeholder="Product Designer"
+            autoComplete="organization-title"
+          />
+          <TextField
+            label="Organization"
+            icon={Building2}
+            value={contactInfo.organization}
+            onChange={(value) => handleInputChange('organization', value)}
+            placeholder="Northwind Studio"
+            autoComplete="organization"
           />
         </div>
-      </div>
+      </Section>
 
-      {/* Contact Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <Phone className="inline w-4 h-4 mr-1" />
-            Phone Number
-          </label>
-          <input
+      <Section title="How to reach you" description="Add a phone number or an email to enable downloads.">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <TextField
+            label="Phone"
+            icon={Phone}
             type="tel"
+            inputMode="tel"
             value={contactInfo.phone}
-            onChange={(e) => handleInputChange('phone', e.target.value)}
-            className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200"
-            placeholder="+1 (555) 123-4567"
+            onChange={(value) => handleInputChange('phone', value)}
+            placeholder="+1 555 123 4567"
+            autoComplete="tel"
           />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <Mail className="inline w-4 h-4 mr-1" />
-            Email Address
-          </label>
-          <input
+          <TextField
+            label="Email"
+            icon={Mail}
             type="email"
+            inputMode="email"
             value={contactInfo.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
-            className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200"
-            placeholder="john.doe@example.com"
+            onChange={(value) => handleInputChange('email', value)}
+            placeholder="jane@example.com"
+            autoComplete="email"
           />
         </div>
-      </div>
-
-      {/* Website */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          <Globe className="inline w-4 h-4 mr-1" />
-          Website
-        </label>
-        <input
+        <TextField
+          label="Website"
+          icon={Globe}
           type="url"
+          inputMode="url"
           value={contactInfo.website}
-          onChange={(e) => handleInputChange('website', e.target.value)}
-          className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200"
-          placeholder="https://www.example.com"
+          onChange={(value) => handleInputChange('website', value)}
+          placeholder="https://example.com"
+          autoComplete="url"
         />
-      </div>
+      </Section>
 
-      {/* Address */}
-      <div className="space-y-4">
-        <label className="block text-sm font-medium text-gray-700">
-          <MapPin className="inline w-4 h-4 mr-1" />
-          Address
-        </label>
-        
-        <div>
-          <input
-            type="text"
-            value={contactInfo.address.street}
-            onChange={(e) => handleAddressChange('street', e.target.value)}
-            className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200"
-            placeholder="Street Address"
-          />
-        </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <input
-            type="text"
+      <Section title="Address" description="Optional.">
+        <TextField
+          label="Street address"
+          icon={MapPin}
+          labelHidden
+          value={contactInfo.address.street}
+          onChange={(value) => handleAddressChange('street', value)}
+          placeholder="Street address"
+          autoComplete="street-address"
+        />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <TextField
+            label="City"
+            labelHidden
             value={contactInfo.address.city}
-            onChange={(e) => handleAddressChange('city', e.target.value)}
-            className="px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200"
+            onChange={(value) => handleAddressChange('city', value)}
             placeholder="City"
+            autoComplete="address-level2"
           />
-          <input
-            type="text"
+          <TextField
+            label="State or region"
+            labelHidden
             value={contactInfo.address.state}
-            onChange={(e) => handleAddressChange('state', e.target.value)}
-            className="px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200"
+            onChange={(value) => handleAddressChange('state', value)}
             placeholder="State"
+            autoComplete="address-level1"
           />
-          <input
-            type="text"
+          <TextField
+            label="ZIP or postal code"
+            labelHidden
             value={contactInfo.address.zip}
-            onChange={(e) => handleAddressChange('zip', e.target.value)}
-            className="px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200"
+            onChange={(value) => handleAddressChange('zip', value)}
             placeholder="ZIP"
+            autoComplete="postal-code"
           />
-          <input
-            type="text"
+          <TextField
+            label="Country"
+            labelHidden
             value={contactInfo.address.country}
-            onChange={(e) => handleAddressChange('country', e.target.value)}
-            className="px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200"
+            onChange={(value) => handleAddressChange('country', value)}
             placeholder="Country"
+            autoComplete="country-name"
           />
         </div>
-      </div>
+      </Section>
 
-      {/* Notes */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Notes
-        </label>
-        <textarea
+      <Section title="Notes" description="A short line that appears on your card and in the saved contact.">
+        <TextAreaField
+          label="Notes"
+          labelHidden
           value={contactInfo.note}
-          onChange={(e) => handleInputChange('note', e.target.value)}
-          rows={3}
-          className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white transition-all duration-200 resize-vertical"
-          placeholder="Additional information or notes..."
+          onChange={(value) => handleInputChange('note', value)}
+          placeholder="Available for freelance work · Based in Lisbon"
+          maxLength={200}
         />
-      </div>
+      </Section>
     </div>
   );
 }

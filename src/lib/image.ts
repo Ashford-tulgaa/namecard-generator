@@ -1,58 +1,69 @@
 // Image utility functions for profile photo processing
 
-export const compressImage = (file: File, maxWidth = 400, quality = 0.8): Promise<string> => {
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+const SUPPORTED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+
+/**
+ * Center-crops to a square and re-encodes as JPEG. Square output matches the
+ * round avatar in the preview and the 1:1 photo that contact apps expect, so
+ * faces no longer get lopped off by the CSS crop.
+ */
+export const compressImage = (file: File, size = 400, quality = 0.85): Promise<string> => {
   return new Promise((resolve, reject) => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    const objectUrl = URL.createObjectURL(file);
     const img = new Image();
 
+    const cleanup = () => URL.revokeObjectURL(objectUrl);
+
     img.onload = () => {
-      // Calculate new dimensions while maintaining aspect ratio
-      const { width, height } = img;
-      const aspectRatio = width / height;
-      
-      let newWidth = maxWidth;
-      let newHeight = maxWidth;
-      
-      if (aspectRatio > 1) {
-        // Landscape
-        newHeight = maxWidth / aspectRatio;
-      } else if (aspectRatio < 1) {
-        // Portrait
-        newWidth = maxWidth * aspectRatio;
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('This browser cannot process images');
+
+        const edge = Math.min(img.naturalWidth, img.naturalHeight);
+        if (!edge) throw new Error('Image has no dimensions');
+
+        const sourceX = (img.naturalWidth - edge) / 2;
+        const sourceY = (img.naturalHeight - edge) / 2;
+
+        // JPEG has no alpha channel — fill first so transparent PNGs don't go black.
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, size, size);
+        ctx.drawImage(img, sourceX, sourceY, edge, edge, 0, 0, size, size);
+
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error('Failed to process image'));
+      } finally {
+        cleanup();
       }
-
-      canvas.width = newWidth;
-      canvas.height = newHeight;
-
-      // Draw and compress
-      ctx?.drawImage(img, 0, 0, newWidth, newHeight);
-      
-      const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-      resolve(compressedDataUrl);
     };
 
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => {
+      cleanup();
+      reject(new Error('That file could not be read as an image'));
+    };
+
+    img.src = objectUrl;
   });
 };
 
 export const validateImageFile = (file: File): { isValid: boolean; error?: string } => {
-  // Check file type
   if (!file.type.startsWith('image/')) {
-    return { isValid: false, error: 'Please select an image file' };
+    return { isValid: false, error: 'Please choose an image file.' };
   }
 
-  // Check file size (5MB limit)
-  const maxSize = 5 * 1024 * 1024;
-  if (file.size > maxSize) {
-    return { isValid: false, error: 'Image size should be less than 5MB' };
+  if (file.size > MAX_IMAGE_BYTES) {
+    return { isValid: false, error: 'That image is over 5MB. Please choose a smaller one.' };
   }
 
-  // Check if it's a supported format
-  const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-  if (!supportedTypes.includes(file.type)) {
-    return { isValid: false, error: 'Supported formats: JPEG, PNG, GIF, WebP' };
+  if (!SUPPORTED_TYPES.includes(file.type)) {
+    return { isValid: false, error: 'Supported formats are JPEG, PNG, GIF and WebP.' };
   }
 
   return { isValid: true };
