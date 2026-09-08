@@ -180,7 +180,7 @@ export default function PromoModal() {
         <div className="px-6 pb-6 pt-5">
           <p id="promo-description" className="text-[15px] leading-relaxed text-slate-600">
             Try <span className="font-medium text-slate-900">Ariona AI reception</span> — it answers
-            your calls, books appointments straight into your calendar, and follows up with clients
+            your texts automatically, books appointments straight into your calendar, and follows up with clients
             around the clock.
           </p>
 
